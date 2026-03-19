@@ -292,7 +292,11 @@ async function analyzeHive() {
     showResult(data);
 
   } catch (err) {
-    alert('Error: ' + err.message + '\n\nMake sure backend is running with:\npython -m uvicorn main:app --reload --host 0.0.0.0');
+    if (err.message.includes('fetch') || err.message.includes('Failed')) {
+      alert('Server is waking up (free tier).\n\nPlease wait 30 seconds and try again.\n\nTip: Visit https://hiveiq-backend.onrender.com first to wake the server, then come back.');
+    } else {
+      alert('Error: ' + err.message);
+    }
   } finally {
     document.getElementById('loadingOverlay').classList.remove('show');
   }
