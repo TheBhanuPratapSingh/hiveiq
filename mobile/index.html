@@ -252,6 +252,8 @@
 
 <script>
 const API_URL = 'https://hiveiq-backend.onrender.com';
+// Wake server when app loads
+fetch(API_URL + '/').catch(() => {});
 let currentImage = null;
 let currentResult = null;
 
@@ -275,14 +277,35 @@ async function analyzeHive() {
   if (!currentImage) return;
 
   document.getElementById('loadingOverlay').classList.add('show');
+  document.querySelector('.loading-sub').textContent = 'Connecting to server...';
 
   try {
+    // Try to wake server first with retries
+    let serverReady = false;
+    for (let i = 0; i < 5; i++) {
+      try {
+        const wake = await fetch(API_URL + '/', { signal: AbortSignal.timeout(8000) });
+        if (wake.ok) { serverReady = true; break; }
+      } catch (e) {
+        document.querySelector('.loading-sub').textContent =
+          `Waking server... attempt ${i + 1}/5`;
+        await new Promise(r => setTimeout(r, 4000));
+      }
+    }
+
+    if (!serverReady) {
+      throw new Error('Server could not wake up. Please try again in 1 minute.');
+    }
+
+    document.querySelector('.loading-sub').textContent = 'Analyzing hive...';
+
     const formData = new FormData();
     formData.append('file', currentImage);
 
     const response = await fetch(`${API_URL}/scan?hive_name=Hive-1`, {
       method: 'POST',
       body: formData,
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) throw new Error('Server returned ' + response.status);
@@ -292,13 +315,10 @@ async function analyzeHive() {
     showResult(data);
 
   } catch (err) {
-    if (err.message.includes('fetch') || err.message.includes('Failed')) {
-      alert('Server is waking up (free tier).\n\nPlease wait 30 seconds and try again.\n\nTip: Visit https://hiveiq-backend.onrender.com first to wake the server, then come back.');
-    } else {
-      alert('Error: ' + err.message);
-    }
+    alert('Error: ' + err.message);
   } finally {
     document.getElementById('loadingOverlay').classList.remove('show');
+    document.querySelector('.loading-sub').textContent = 'Checking bee activity, brood patterns...';
   }
 }
 
