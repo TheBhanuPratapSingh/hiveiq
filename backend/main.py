@@ -227,4 +227,11 @@ def list_hives():
 @app.get("/app")
 def serve_app():
     html_path = os.path.join(os.path.dirname(__file__), "..", "mobile", "index.html")
-    return FileResponse(html_path)
+    return FileResponse(
+        html_path,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
