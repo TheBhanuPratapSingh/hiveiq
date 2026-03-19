@@ -1,10 +1,14 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import io
 import numpy as np
 
 app = FastAPI(title="HiveIQ API")
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 app.add_middleware(
     CORSMiddleware,
@@ -176,15 +180,37 @@ async def scan_hive(
     hive_name: str = "Hive-1",
     file: UploadFile = File(...)
 ):
-    contents = await file.read()
-    image = Image.open(io.BytesIO(contents)).convert("RGB")
-    image = image.resize((224, 224))
-    img_array = np.array(image)
+    try:
+        contents = await file.read()
+        
+        # Handle image opening safely
+        try:
+            image = Image.open(io.BytesIO(contents)).convert("RGB")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image: {str(e)}")
+        
+        image = image.resize((224, 224))
+        img_array = np.array(image)
 
-    result = analyze_image(img_array)
-    result["hive_name"] = hive_name
-    save_scan(result)
-    return result
+        result = analyze_image(img_array)
+        result["hive_name"] = hive_name
+        
+        # Save to database safely
+        try:
+            save_scan(result)
+        except Exception as e:
+            print(f"DB save error: {e}")
+            # Continue even if save fails
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Scan error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/history/{hive_name}")
 def get_history(hive_name: str):
@@ -197,3 +223,8 @@ def check_alerts(hive_name: str):
 @app.get("/hives")
 def list_hives():
     return {"hives": get_all_hives()}
+
+@app.get("/app")
+def serve_app():
+    html_path = os.path.join(os.path.dirname(__file__), "..", "mobile", "index.html")
+    return FileResponse(html_path)

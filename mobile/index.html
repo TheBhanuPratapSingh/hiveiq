@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="HiveIQ"/>
+<title>HiveIQ — Beehive Scanner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #1a1007; color: #FDE8BB;
+    min-height: 100vh; padding: 0;
+  }
+  .header {
+    background: #2C1D08; padding: 16px 20px;
+    display: flex; align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #4A3010;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header h1 { color: #F5A623; font-size: 20px; }
+  .header button {
+    background: none; border: 1px solid #4A3010;
+    color: #FDE8BB; padding: 6px 12px;
+    border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .page { display: none; padding: 20px; max-width: 500px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* Camera Page */
+  .image-box {
+    width: 100%; aspect-ratio: 1;
+    background: #2C1D08; border-radius: 16px;
+    border: 1px solid #F5A623; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px; position: relative;
+  }
+  .image-box img { width: 100%; height: 100%; object-fit: cover; }
+  .placeholder { text-align: center; opacity: 0.5; }
+  .placeholder span { font-size: 60px; display: block; margin-bottom: 8px; }
+  .btn-primary {
+    width: 100%; padding: 16px; border-radius: 12px;
+    background: #F5A623; border: none; color: #1a1007;
+    font-size: 16px; font-weight: bold; cursor: pointer;
+    margin-bottom: 10px; display: block;
+  }
+  .btn-secondary {
+    width: 100%; padding: 16px; border-radius: 12px;
+    background: none; border: 1px solid #F5A623;
+    color: #F5A623; font-size: 16px; cursor: pointer;
+    margin-bottom: 10px; display: block;
+  }
+  .btn-analyze {
+    width: 100%; padding: 18px; border-radius: 12px;
+    background: #F5A623; border: none; color: #1a1007;
+    font-size: 18px; font-weight: bold; cursor: pointer;
+    margin-bottom: 10px; display: none;
+  }
+  .btn-history {
+    width: 100%; padding: 14px; border-radius: 12px;
+    background: #2C1D08; border: 1px solid #4A3010;
+    color: #FDE8BB; font-size: 14px; cursor: pointer;
+    margin-top: 6px;
+  }
+  .tip {
+    margin-top: 16px; font-size: 12px;
+    opacity: 0.5; text-align: center; line-height: 1.6;
+  }
+  input[type=file] { display: none; }
+
+  /* Result Page */
+  .result-image {
+    width: 100%; height: 200px;
+    object-fit: cover; border-radius: 12px;
+    margin-bottom: 16px; display: none;
+  }
+  .risk-badge {
+    padding: 14px; border-radius: 12px;
+    text-align: center; font-size: 18px;
+    font-weight: bold; letter-spacing: 2px;
+    margin-bottom: 12px; border: 1px solid;
+  }
+  .card {
+    background: #2C1D08; border-radius: 16px;
+    border: 1px solid #4A3010; padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-label {
+    font-size: 11px; opacity: 0.6;
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .card-value { font-size: 28px; font-weight: bold; color: #F5A623; }
+  .diagnosis { font-size: 20px; font-weight: bold; color: #F5A623; margin-bottom: 12px; }
+  .metric-row {
+    display: flex; align-items: center;
+    gap: 8px; margin-bottom: 10px;
+  }
+  .metric-label { font-size: 12px; width: 110px; flex-shrink: 0; }
+  .metric-bar-bg {
+    flex: 1; height: 8px; background: #4A3010;
+    border-radius: 4px; overflow: hidden;
+  }
+  .metric-bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s; }
+  .metric-pct { font-size: 12px; width: 35px; text-align: right; }
+  .rec-item {
+    display: flex; gap: 8px; margin-bottom: 8px;
+    font-size: 13px; line-height: 1.6;
+  }
+  .rec-dot { color: #F5A623; flex-shrink: 0; }
+  .section-title {
+    color: #F5A623; font-size: 15px;
+    font-weight: bold; margin-bottom: 12px;
+  }
+
+  /* History Page */
+  .scan-card {
+    background: #2C1D08; border-radius: 12px;
+    border: 1px solid #4A3010; padding: 14px;
+    margin-bottom: 8px;
+  }
+  .scan-header {
+    display: flex; justify-content: space-between;
+    align-items: center; margin-bottom: 6px;
+  }
+  .scan-class { font-weight: bold; font-size: 14px; }
+  .risk-pill {
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: bold;
+  }
+  .scan-score { color: #F5A623; font-size: 13px; margin-bottom: 4px; }
+  .scan-time { font-size: 11px; opacity: 0.4; }
+  .alert-card {
+    border-radius: 12px; border: 1px solid;
+    padding: 12px; margin-bottom: 8px;
+    background: #2C1D08;
+  }
+  .alert-level { font-weight: bold; font-size: 12px; margin-bottom: 4px; }
+  .alert-msg { font-size: 13px; line-height: 1.6; }
+  .empty-text { text-align: center; opacity: 0.5; padding: 20px; }
+  .loading-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26,16,7,0.9);
+    align-items: center; justify-content: center;
+    flex-direction: column; z-index: 100;
+  }
+  .loading-overlay.show { display: flex; }
+  .spinner {
+    width: 50px; height: 50px; border: 3px solid #4A3010;
+    border-top-color: #F5A623; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin-bottom: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { color: #F5A623; font-size: 16px; }
+  .loading-sub { color: #FDE8BB; opacity: 0.5; font-size: 13px; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>🐝 HiveIQ</h1>
+  <button onclick="showPage('history')">📊 History</button>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Analyzing hive...</div>
+  <div class="loading-sub">Checking bee activity, brood patterns...</div>
+</div>
+
+<!-- Camera Page -->
+<div class="page active" id="page-camera">
+  <br>
+  <div class="image-box" id="imageBox">
+    <div class="placeholder" id="placeholder">
+      <span>🍯</span>
+      <p>No image selected</p>
+    </div>
+    <img id="previewImg" src="" alt="" style="display:none"/>
+  </div>
+
+  <input type="file" id="fileInput" accept="image/*"/>
+  <input type="file" id="cameraInput" accept="image/*" capture="environment"/>
+
+  <button class="btn-primary" onclick="document.getElementById('cameraInput').click()">
+    📷 Take Photo
+  </button>
+  <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">
+    🖼️ Choose from Gallery
+  </button>
+  <button class="btn-analyze" id="analyzeBtn" onclick="analyzeHive()">
+    🔬 Analyze Hive Health
+  </button>
+  <button class="btn-history" onclick="showPage('history')">
+    📊 View Scan History
+  </button>
+  <p class="tip">💡 Get close to the frame in good lighting for best results</p>
+</div>
+
+<!-- Result Page -->
+<div class="page" id="page-result">
+  <br>
+  <img id="resultImage" class="result-image" src="" alt=""/>
+  <div class="risk-badge" id="riskBadge"></div>
+
+  <div class="card">
+    <div class="card-label">Diagnosis</div>
+    <div class="diagnosis" id="diagnosisText"></div>
+    <div class="card-label">Overall Health Score</div>
+    <div class="card-value" id="scoreText"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">📐 Detailed Analysis</div>
+    <div id="metricsContainer"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">💡 Recommendations</div>
+    <div id="recsContainer"></div>
+  </div>
+
+  <button class="btn-primary" onclick="showPage('camera')" style="margin-top:8px">
+    📷 Scan Another Hive
+  </button>
+  <button class="btn-secondary" onclick="showPage('history')">
+    📊 View History
+  </button>
+  <br>
+</div>
+
+<!-- History Page -->
+<div class="page" id="page-history">
+  <br>
+  <h2 style="color:#F5A623; margin-bottom:16px">🏠 Hive-1 History</h2>
+  <div id="alertsContainer"></div>
+  <div class="section-title">📋 Recent Scans</div>
+  <div id="scansContainer"></div>
+  <button class="btn-secondary" onclick="loadHistory()" style="margin-top:8px">
+    🔄 Refresh
+  </button>
+  <button class="btn-history" onclick="showPage('camera')" style="margin-top:8px">
+    ← Back to Scanner
+  </button>
+  <br>
+</div>
+
+<script>
+const API_URL = 'http://192.168.1.30:8000';
+let currentImage = null;
+let currentResult = null;
+
+// ── Image selection ────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', handleImageSelect);
+document.getElementById('cameraInput').addEventListener('change', handleImageSelect);
+
+function handleImageSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  currentImage = file;
+  const url = URL.createObjectURL(file);
+  document.getElementById('previewImg').src = url;
+  document.getElementById('previewImg').style.display = 'block';
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('analyzeBtn').style.display = 'block';
+}
+
+// ── Analyze ────────────────────────────────────────────────
+async function analyzeHive() {
+  if (!currentImage) return;
+
+  document.getElementById('loadingOverlay').classList.add('show');
+
+  try {
+    const formData = new FormData();
+    formData.append('file', currentImage);
+
+    const response = await fetch(`${API_URL}/scan?hive_name=Hive-1`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) throw new Error('Server returned ' + response.status);
+
+    const data = await response.json();
+    currentResult = data;
+    showResult(data);
+
+  } catch (err) {
+    alert('Error: ' + err.message + '\n\nMake sure backend is running with:\npython -m uvicorn main:app --reload --host 0.0.0.0');
+  } finally {
+    document.getElementById('loadingOverlay').classList.remove('show');
+  }
+}
+
+// ── Show Result ────────────────────────────────────────────
+function showResult(data) {
+  const riskColors = {
+    LOW: '#4CAF50', MEDIUM: '#FF9800',
+    HIGH: '#f44336', CRITICAL: '#b71c1c'
+  };
+  const classLabels = {
+    healthy: '✅ Healthy',
+    unhealthy: '⚠️ Unhealthy',
+    chalkbrood: '🍞 Chalkbrood',
+    american_foulbrood: '🚨 American Foulbrood',
+    varroa: '🔴 Varroa Mites',
+  };
+
+  const color = riskColors[data.risk_level] || '#888';
+
+  // Risk badge
+  const badge = document.getElementById('riskBadge');
+  badge.textContent = data.risk_level + ' RISK';
+  badge.style.color = color;
+  badge.style.borderColor = color;
+  badge.style.backgroundColor = color + '22';
+
+  // Result image
+  const img = document.getElementById('resultImage');
+  img.src = URL.createObjectURL(currentImage);
+  img.style.display = 'block';
+
+  // Diagnosis
+  document.getElementById('diagnosisText').textContent =
+    classLabels[data.final_class] || data.final_class;
+  document.getElementById('scoreText').textContent =
+    Math.round(data.overall_score * 100) + ' / 100';
+
+  // Metrics
+  const metrics = [
+    { label: '🐝 Bee Activity', value: data.bee_activity, color: '#F5A623' },
+    { label: '🌑 Dark Cells',   value: data.dark_cells,   color: data.dark_cells > 0.5 ? '#4CAF50' : '#f44336' },
+    { label: '🔶 Brood Pattern',value: data.brood_score,  color: '#2196F3' },
+    { label: '🍯 Comb Fill',    value: data.comb_fill,    color: '#FF9800' },
+  ];
+
+  document.getElementById('metricsContainer').innerHTML = metrics.map(m => `
+    <div class="metric-row">
+      <div class="metric-label">${m.label}</div>
+      <div class="metric-bar-bg">
+        <div class="metric-bar-fill"
+          style="width:${Math.round(m.value*100)}%; background:${m.color}">
+        </div>
+      </div>
+      <div class="metric-pct">${Math.round(m.value*100)}%</div>
+    </div>
+  `).join('');
+
+  // Recommendations
+  const recs = data.recommendations || [];
+  document.getElementById('recsContainer').innerHTML = recs.map(r => `
+    <div class="rec-item">
+      <span class="rec-dot">•</span>
+      <span>${r}</span>
+    </div>
+  `).join('');
+
+  showPage('result');
+}
+
+// ── History ────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const [histRes, alertRes] = await Promise.all([
+      fetch(`${API_URL}/history/Hive-1`),
+      fetch(`${API_URL}/alerts/Hive-1`),
+    ]);
+    const histData  = await histRes.json();
+    const alertData = await alertRes.json();
+
+    const riskColors = {
+      LOW:'#4CAF50', MEDIUM:'#FF9800',
+      HIGH:'#f44336', CRITICAL:'#b71c1c'
+    };
+
+    // Alerts
+    const alerts = alertData.alerts || [];
+    document.getElementById('alertsContainer').innerHTML = alerts.length
+      ? alerts.map(a => `
+          <div class="alert-card" style="border-color:${a.level==='CRITICAL'?'#b71c1c':'#FF9800'}">
+            <div class="alert-level" style="color:${a.level==='CRITICAL'?'#f44336':'#FF9800'}">
+              ${a.level}
+            </div>
+            <div class="alert-msg">${a.message}</div>
+          </div>
+        `).join('')
+      : '';
+
+    // Scans
+    const scans = histData.scans || [];
+    document.getElementById('scansContainer').innerHTML = scans.length === 0
+      ? '<p class="empty-text">No scans yet. Take a photo to start!</p>'
+      : scans.map(s => `
+          <div class="scan-card">
+            <div class="scan-header">
+              <span class="scan-class">
+                ${s.final_class === 'healthy' ? '✅' : '⚠️'} ${s.final_class}
+              </span>
+              <span class="risk-pill"
+                style="background:${(riskColors[s.risk_level]||'#888')}33;
+                       color:${riskColors[s.risk_level]||'#888'}">
+                ${s.risk_level}
+              </span>
+            </div>
+            <div class="scan-score">
+              Health Score: ${Math.round((s.overall_score||0)*100)}%
+            </div>
+            <div class="scan-time">
+              ${new Date(s.timestamp).toLocaleString()}
+            </div>
+          </div>
+        `).join('');
+  } catch(e) {
+    document.getElementById('scansContainer').innerHTML =
+      '<p class="empty-text">Could not load history. Is backend running?</p>';
+  }
+}
+
+// ── Navigation ─────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  window.scrollTo(0, 0);
+  if (name === 'history') loadHistory();
+}
+</script>
+</body>
+</html>
