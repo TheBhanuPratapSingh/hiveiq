@@ -29,8 +29,6 @@
   }
   .page { display: none; padding: 20px; max-width: 500px; margin: 0 auto; }
   .page.active { display: block; }
-
-  /* Camera Page */
   .image-box {
     width: 100%; aspect-ratio: 1;
     background: #2C1D08; border-radius: 16px;
@@ -70,8 +68,6 @@
     opacity: 0.5; text-align: center; line-height: 1.6;
   }
   input[type=file] { display: none; }
-
-  /* Result Page */
   .result-image {
     width: 100%; height: 200px;
     object-fit: cover; border-radius: 12px;
@@ -115,8 +111,6 @@
     color: #F5A623; font-size: 15px;
     font-weight: bold; margin-bottom: 12px;
   }
-
-  /* History Page */
   .scan-card {
     background: #2C1D08; border-radius: 12px;
     border: 1px solid #4A3010; padding: 14px;
@@ -156,6 +150,30 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .loading-text { color: #F5A623; font-size: 16px; }
   .loading-sub { color: #FDE8BB; opacity: 0.5; font-size: 13px; margin-top: 6px; }
+  .suggestion-btn {
+    padding: 6px 12px; border-radius: 20px;
+    background: #2C1D08; border: 1px solid #4A3010;
+    color: #FDE8BB; font-size: 12px; cursor: pointer;
+  }
+  .bot-bubble { display: flex; gap: 10px; align-items: flex-start; }
+  .bubble-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #F5A623; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0; margin-top: 2px;
+  }
+  .bubble-text {
+    background: #2C1D08; border: 1px solid #4A3010;
+    border-radius: 16px 16px 16px 4px;
+    padding: 12px 14px; font-size: 14px;
+    line-height: 1.6; color: #FDE8BB; max-width: 85%;
+  }
+  .user-bubble { display: flex; justify-content: flex-end; }
+  .user-bubble .bubble-text {
+    background: #F5A623; color: #1a1007;
+    border-radius: 16px 16px 4px 16px;
+    border: none;
+  }
 </style>
 </head>
 <body>
@@ -163,7 +181,10 @@
 <!-- Header -->
 <div class="header">
   <h1>🐝 HiveIQ</h1>
-  <button onclick="showPage('history')">📊 History</button>
+  <div style="display:flex;gap:8px">
+    <button onclick="showPage('chat')">🤖 BeeBot</button>
+    <button onclick="showPage('history')">📊 History</button>
+  </div>
 </div>
 
 <!-- Loading Overlay -->
@@ -207,24 +228,20 @@
   <br>
   <img id="resultImage" class="result-image" src="" alt=""/>
   <div class="risk-badge" id="riskBadge"></div>
-
   <div class="card">
     <div class="card-label">Diagnosis</div>
     <div class="diagnosis" id="diagnosisText"></div>
     <div class="card-label">Overall Health Score</div>
     <div class="card-value" id="scoreText"></div>
   </div>
-
   <div class="card">
     <div class="section-title">📐 Detailed Analysis</div>
     <div id="metricsContainer"></div>
   </div>
-
   <div class="card">
     <div class="section-title">💡 Recommendations</div>
     <div id="recsContainer"></div>
   </div>
-
   <button class="btn-primary" onclick="showPage('camera')" style="margin-top:8px">
     📷 Scan Another Hive
   </button>
@@ -234,10 +251,89 @@
   <br>
 </div>
 
+<!-- Chat Page -->
+<div class="page" id="page-chat">
+  <br>
+  <h2 style="color:#F5A623;font-size:20px;margin-bottom:4px">
+    🤖 BeeBot
+  </h2>
+  <p style="font-size:12px;opacity:0.5;margin-bottom:12px">
+    Your Apis mellifera beekeeping assistant
+  </p>
+
+  <div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px">
+    <button class="suggestion-btn"
+      onclick="askSuggestion('How do I treat Varroa mites?')">
+      Varroa treatment
+    </button>
+    <button class="suggestion-btn"
+      onclick="askSuggestion('How do I know if my queen is healthy?')">
+      Queen health
+    </button>
+    <button class="suggestion-btn"
+      onclick="askSuggestion('When should I harvest honey?')">
+      Honey harvest
+    </button>
+    <button class="suggestion-btn"
+      onclick="askSuggestion('How do I prevent swarming?')">
+      Swarm prevention
+    </button>
+    <button class="suggestion-btn"
+      onclick="askSuggestion('What is American Foulbrood?')">
+      About AFB
+    </button>
+    <button class="suggestion-btn"
+      onclick="askSuggestion('How often should I inspect my hive?')">
+      Inspection tips
+    </button>
+  </div>
+
+  <div id="chatMessages" style="
+    height: 380px; overflow-y: auto;
+    display: flex; flex-direction: column;
+    gap: 12px; margin-bottom: 12px;
+  ">
+    <div class="bot-bubble">
+      <div class="bubble-icon">🐝</div>
+      <div class="bubble-text">
+        Hi! I am BeeBot, your Apis mellifera beekeeping assistant.
+        Ask me anything about your hive, bee diseases, treatments,
+        or general beekeeping advice!
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px">
+    <textarea
+      id="chatInput"
+      placeholder="Ask about your bees..."
+      rows="2"
+      style="
+        flex:1; padding:12px; border-radius:12px;
+        background:#2C1D08; border:1px solid #4A3010;
+        color:#FDE8BB; font-size:14px; resize:none;
+        font-family:inherit; line-height:1.4;
+      "
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"
+    ></textarea>
+    <button onclick="sendChat()" style="
+      padding:12px 16px; border-radius:12px;
+      background:#F5A623; border:none;
+      color:#1a1007; font-size:18px;
+      cursor:pointer; height:48px;
+    ">➤</button>
+  </div>
+
+  <button class="btn-history" onclick="showPage('camera')">
+    ← Back to Scanner
+  </button>
+  <br>
+</div>
+
 <!-- History Page -->
 <div class="page" id="page-history">
   <br>
-  <h2 style="color:#F5A623; margin-bottom:16px">🏠 Hive-1 History</h2>
+  <h2 style="color:#F5A623;margin-bottom:16px">🏠 Hive-1 History</h2>
   <div id="alertsContainer"></div>
   <div class="section-title">📋 Recent Scans</div>
   <div id="scansContainer"></div>
@@ -252,12 +348,10 @@
 
 <script>
 const API_URL = 'https://hiveiq-backend.onrender.com';
-// Wake server when app loads
 fetch(API_URL + '/').catch(() => {});
 let currentImage = null;
 let currentResult = null;
 
-// ── Image selection ────────────────────────────────────────
 document.getElementById('fileInput').addEventListener('change', handleImageSelect);
 document.getElementById('cameraInput').addEventListener('change', handleImageSelect);
 
@@ -272,15 +366,11 @@ function handleImageSelect(e) {
   document.getElementById('analyzeBtn').style.display = 'block';
 }
 
-// ── Analyze ────────────────────────────────────────────────
 async function analyzeHive() {
   if (!currentImage) return;
-
   document.getElementById('loadingOverlay').classList.add('show');
   document.querySelector('.loading-sub').textContent = 'Connecting to server...';
-
   try {
-    // Try to wake server first with retries
     let serverReady = false;
     for (let i = 0; i < 5; i++) {
       try {
@@ -292,28 +382,21 @@ async function analyzeHive() {
         await new Promise(r => setTimeout(r, 4000));
       }
     }
-
     if (!serverReady) {
       throw new Error('Server could not wake up. Please try again in 1 minute.');
     }
-
     document.querySelector('.loading-sub').textContent = 'Analyzing hive...';
-
     const formData = new FormData();
     formData.append('file', currentImage);
-
     const response = await fetch(`${API_URL}/scan?hive_name=Hive-1`, {
       method: 'POST',
       body: formData,
       signal: AbortSignal.timeout(30000),
     });
-
     if (!response.ok) throw new Error('Server returned ' + response.status);
-
     const data = await response.json();
     currentResult = data;
     showResult(data);
-
   } catch (err) {
     alert('Error: ' + err.message);
   } finally {
@@ -322,7 +405,6 @@ async function analyzeHive() {
   }
 }
 
-// ── Show Result ────────────────────────────────────────────
 function showResult(data) {
   const riskColors = {
     LOW: '#4CAF50', MEDIUM: '#FF9800',
@@ -335,48 +417,36 @@ function showResult(data) {
     american_foulbrood: '🚨 American Foulbrood',
     varroa: '🔴 Varroa Mites',
   };
-
   const color = riskColors[data.risk_level] || '#888';
-
-  // Risk badge
   const badge = document.getElementById('riskBadge');
   badge.textContent = data.risk_level + ' RISK';
   badge.style.color = color;
   badge.style.borderColor = color;
   badge.style.backgroundColor = color + '22';
-
-  // Result image
   const img = document.getElementById('resultImage');
   img.src = URL.createObjectURL(currentImage);
   img.style.display = 'block';
-
-  // Diagnosis
   document.getElementById('diagnosisText').textContent =
     classLabels[data.final_class] || data.final_class;
   document.getElementById('scoreText').textContent =
     Math.round(data.overall_score * 100) + ' / 100';
-
-  // Metrics
   const metrics = [
     { label: '🐝 Bee Activity', value: data.bee_activity, color: '#F5A623' },
-    { label: '🌑 Dark Cells',   value: data.dark_cells,   color: data.dark_cells > 0.5 ? '#4CAF50' : '#f44336' },
-    { label: '🔶 Brood Pattern',value: data.brood_score,  color: '#2196F3' },
-    { label: '🍯 Comb Fill',    value: data.comb_fill,    color: '#FF9800' },
+    { label: '🌑 Dark Cells', value: data.dark_cells, color: data.dark_cells > 0.5 ? '#4CAF50' : '#f44336' },
+    { label: '🔶 Brood Pattern', value: data.brood_score, color: '#2196F3' },
+    { label: '🍯 Comb Fill', value: data.comb_fill, color: '#FF9800' },
   ];
-
   document.getElementById('metricsContainer').innerHTML = metrics.map(m => `
     <div class="metric-row">
       <div class="metric-label">${m.label}</div>
       <div class="metric-bar-bg">
         <div class="metric-bar-fill"
-          style="width:${Math.round(m.value*100)}%; background:${m.color}">
+          style="width:${Math.round(m.value*100)}%;background:${m.color}">
         </div>
       </div>
       <div class="metric-pct">${Math.round(m.value*100)}%</div>
     </div>
   `).join('');
-
-  // Recommendations
   const recs = data.recommendations || [];
   document.getElementById('recsContainer').innerHTML = recs.map(r => `
     <div class="rec-item">
@@ -384,26 +454,21 @@ function showResult(data) {
       <span>${r}</span>
     </div>
   `).join('');
-
   showPage('result');
 }
 
-// ── History ────────────────────────────────────────────────
 async function loadHistory() {
   try {
     const [histRes, alertRes] = await Promise.all([
       fetch(`${API_URL}/history/Hive-1`),
       fetch(`${API_URL}/alerts/Hive-1`),
     ]);
-    const histData  = await histRes.json();
+    const histData = await histRes.json();
     const alertData = await alertRes.json();
-
     const riskColors = {
       LOW:'#4CAF50', MEDIUM:'#FF9800',
       HIGH:'#f44336', CRITICAL:'#b71c1c'
     };
-
-    // Alerts
     const alerts = alertData.alerts || [];
     document.getElementById('alertsContainer').innerHTML = alerts.length
       ? alerts.map(a => `
@@ -415,8 +480,6 @@ async function loadHistory() {
           </div>
         `).join('')
       : '';
-
-    // Scans
     const scans = histData.scans || [];
     document.getElementById('scansContainer').innerHTML = scans.length === 0
       ? '<p class="empty-text">No scans yet. Take a photo to start!</p>'
@@ -446,12 +509,75 @@ async function loadHistory() {
   }
 }
 
-// ── Navigation ─────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   window.scrollTo(0, 0);
   if (name === 'history') loadHistory();
+}
+
+// ── BeeBot Chat ─────────────────────────────────────────
+let chatHistory = [];
+
+function askSuggestion(question) {
+  document.getElementById('chatInput').value = question;
+  sendChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = '';
+  const messagesDiv = document.getElementById('chatMessages');
+  chatHistory.push({ role: 'user', content: message });
+  messagesDiv.innerHTML += `
+    <div class="user-bubble">
+      <div class="bubble-text">${message}</div>
+    </div>
+  `;
+  messagesDiv.innerHTML += `
+    <div class="bot-bubble" id="typingIndicator">
+      <div class="bubble-icon">🐝</div>
+      <div class="bubble-text" style="opacity:0.6">
+        BeeBot is thinking...
+      </div>
+    </div>
+  `;
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  try {
+    const response = await fetch(`${API_URL}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: message,
+        history: chatHistory.slice(-10),
+      }),
+    });
+    const data = await response.json();
+    const reply = data.reply;
+    chatHistory.push({ role: 'assistant', content: reply });
+    document.getElementById('typingIndicator')?.remove();
+    messagesDiv.innerHTML += `
+      <div class="bot-bubble">
+        <div class="bubble-icon">🐝</div>
+        <div class="bubble-text">
+          ${reply.replace(/\n/g, '<br>')}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    document.getElementById('typingIndicator')?.remove();
+    messagesDiv.innerHTML += `
+      <div class="bot-bubble">
+        <div class="bubble-icon">🐝</div>
+        <div class="bubble-text" style="color:#f44336">
+          Sorry, could not connect. Please try again.
+        </div>
+      </div>
+    `;
+  }
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 </script>
 </body>
