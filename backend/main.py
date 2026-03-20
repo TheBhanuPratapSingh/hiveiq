@@ -1,4 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import io
@@ -237,10 +239,18 @@ def serve_app():
         }
     )
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[ChatMessage]] = []
+
 @app.post("/chat")
-async def chat(request: dict):
-    message = request.get("message", "")
-    history = request.get("history", [])
+async def chat(request: ChatRequest):
+    message = request.message
+    history = request.history or []
 
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
@@ -252,15 +262,10 @@ async def chat(request: dict):
     # Build conversation history for Gemini
     gemini_messages = []
     for h in history[-10:]:
-        # Handle both formats safely
-        role = h.get("role", "user")
-        content = h.get("content", h.get("text", ""))
-        if not content:
-            continue
-        gemini_role = "user" if role == "user" else "model"
+        gemini_role = "user" if h.role == "user" else "model"
         gemini_messages.append({
             "role": gemini_role,
-            "parts": [{"text": content}]
+            "parts": [{"text": h.content}]
         })
 
     # Add current message
@@ -269,7 +274,6 @@ async def chat(request: dict):
         "parts": [{"text": message}]
     })
 
-    # System prompt
     system_prompt = """You are BeeBot, a friendly expert beekeeping
 assistant specializing in Apis mellifera (Western honey bee).
 You help beekeepers with:
@@ -315,6 +319,9 @@ Always remember the user keeps Apis mellifera bees."""
         return {"reply": reply}
 
     except httpx.TimeoutException:
-        raise HTTPException(status_code=500, detail="Request timed out")
+        raise HTTPException(
+            status_code=500,
+            detail="Request timed out — please try again"
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
