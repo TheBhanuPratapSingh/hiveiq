@@ -294,7 +294,7 @@ Always remember the user keeps Apis mellifera bees."""
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
                 headers={"Content-Type": "application/json"},
                 json={
                     "system_instruction": {
