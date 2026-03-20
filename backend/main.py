@@ -252,10 +252,15 @@ async def chat(request: dict):
     # Build conversation history for Gemini
     gemini_messages = []
     for h in history[-10:]:
-        role = "user" if h["role"] == "user" else "model"
+        # Handle both formats safely
+        role = h.get("role", "user")
+        content = h.get("content", h.get("text", ""))
+        if not content:
+            continue
+        gemini_role = "user" if role == "user" else "model"
         gemini_messages.append({
-            "role": role,
-            "parts": [{"text": h["content"]}]
+            "role": gemini_role,
+            "parts": [{"text": content}]
         })
 
     # Add current message
@@ -264,9 +269,9 @@ async def chat(request: dict):
         "parts": [{"text": message}]
     })
 
-    # System prompt about beekeeping
-    system_prompt = """You are BeeBot, a friendly expert beekeeping 
-assistant specializing in Apis mellifera (Western honey bee). 
+    # System prompt
+    system_prompt = """You are BeeBot, a friendly expert beekeeping
+assistant specializing in Apis mellifera (Western honey bee).
 You help beekeepers with:
 - Hive health and disease identification
 - Treatment for Varroa, AFB, Chalkbrood
@@ -278,35 +283,38 @@ You help beekeepers with:
 
 Keep answers practical, clear and friendly.
 Use simple language for beginners.
-When disease is suspected always recommend 
+When disease is suspected always recommend
 consulting a local bee inspector.
 Always remember the user keeps Apis mellifera bees."""
 
-    # Call Gemini API
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
-            headers={"Content-Type": "application/json"},
-            json={
-                "system_instruction": {
-                    "parts": [{"text": system_prompt}]
-                },
-                "contents": gemini_messages,
-                "generationConfig": {
-                    "maxOutputTokens": 1024,
-                    "temperature": 0.7,
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "system_instruction": {
+                        "parts": [{"text": system_prompt}]
+                    },
+                    "contents": gemini_messages,
+                    "generationConfig": {
+                        "maxOutputTokens": 1024,
+                        "temperature": 0.7,
+                    }
                 }
-            }
-        )
+            )
 
-    if response.status_code != 200:
-        error = response.text
-        raise HTTPException(
-            status_code=500,
-            detail=f"Gemini error: {error}"
-        )
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Gemini error: {response.text}"
+            )
 
-    data = response.json()
-    reply = data["candidates"][0]["content"]["parts"][0]["text"]
+        data = response.json()
+        reply = data["candidates"][0]["content"]["parts"][0]["text"]
+        return {"reply": reply}
 
-    return {"reply": reply}
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=500, detail="Request timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
