@@ -46,12 +46,18 @@ def init_db():
 
 def save_scan(result: dict):
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA table_info(scans)").fetchall()
+    try:
+        conn.execute("ALTER TABLE scans ADD COLUMN user_id TEXT")
+        conn.commit()
+    except:
+        pass
     conn.execute("""
         INSERT INTO scans (
             timestamp, hive_name, final_class, overall_score,
             risk_level, bee_activity, dark_cells,
-            brood_score, comb_fill, recommendations
-        ) VALUES (?,?,?,?,?,?,?,?,?,?)
+            brood_score, comb_fill, recommendations, user_id
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
     """, (
         datetime.now().isoformat(),
         result.get("hive_name", "Hive-1"),
@@ -63,18 +69,25 @@ def save_scan(result: dict):
         result.get("brood_score", 0),
         result.get("comb_fill", 0),
         json.dumps(result.get("recommendations", [])),
+        result.get("user_id", "anonymous"),
     ))
     conn.commit()
     conn.close()
 
-def get_scans(hive_name: str, days: int = 30):
+def get_scans(hive_name: str, days: int = 30, user_id: str = None):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     since = (datetime.now() - timedelta(days=days)).isoformat()
-    rows = conn.execute(
-        "SELECT * FROM scans WHERE hive_name=? AND timestamp>=? ORDER BY timestamp DESC",
-        (hive_name, since)
-    ).fetchall()
+    if user_id:
+        rows = conn.execute(
+            "SELECT * FROM scans WHERE hive_name=? AND timestamp>=? AND user_id=? ORDER BY timestamp DESC",
+            (hive_name, since, user_id)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM scans WHERE hive_name=? AND timestamp>=? ORDER BY timestamp DESC",
+            (hive_name, since)
+        ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -173,6 +186,7 @@ def root():
 @app.post("/scan")
 async def scan_hive(
     hive_name: str = "Hive-1",
+    user_id: str = "anonymous",
     file: UploadFile = File(...)
 ):
     try:
@@ -185,6 +199,7 @@ async def scan_hive(
         img_array = np.array(image)
         result = analyze_image(img_array)
         result["hive_name"] = hive_name
+        result["user_id"] = user_id
         try:
             save_scan(result)
         except Exception as e:
@@ -199,8 +214,8 @@ async def scan_hive(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/history/{hive_name}")
-def get_history(hive_name: str):
-    return {"hive_name": hive_name, "scans": get_scans(hive_name)}
+def get_history(hive_name: str, user_id: str = None):
+    return {"hive_name": hive_name, "scans": get_scans(hive_name, user_id=user_id)}
 
 @app.get("/alerts/{hive_name}")
 def check_alerts(hive_name: str):
