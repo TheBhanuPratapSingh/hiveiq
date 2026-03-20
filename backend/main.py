@@ -255,26 +255,15 @@ async def chat(request: ChatRequest):
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
 
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
         raise HTTPException(status_code=500, detail="API key not configured")
 
-    # Build conversation history for Gemini
-    gemini_messages = []
-    for h in history[-10:]:
-        gemini_role = "user" if h.role == "user" else "model"
-        gemini_messages.append({
-            "role": gemini_role,
-            "parts": [{"text": h.content}]
-        })
-
-    # Add current message
-    gemini_messages.append({
-        "role": "user",
-        "parts": [{"text": message}]
-    })
-
-    system_prompt = """You are BeeBot, a friendly expert beekeeping
+    # Build messages
+    messages = [
+        {
+            "role": "system",
+            "content": """You are BeeBot, a friendly expert beekeeping
 assistant specializing in Apis mellifera (Western honey bee).
 You help beekeepers with:
 - Hive health and disease identification
@@ -290,32 +279,46 @@ Use simple language for beginners.
 When disease is suspected always recommend
 consulting a local bee inspector.
 Always remember the user keeps Apis mellifera bees."""
+        }
+    ]
+
+    # Add history
+    for h in history[-10:]:
+        messages.append({
+            "role": h.role,
+            "content": h.content
+        })
+
+    # Add current message
+    messages.append({
+        "role": "user",
+        "content": message
+    })
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={api_key}",
-                headers={"Content-Type": "application/json"},
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
                 json={
-                    "system_instruction": {
-                        "parts": [{"text": system_prompt}]
-                    },
-                    "contents": gemini_messages,
-                    "generationConfig": {
-                        "maxOutputTokens": 1024,
-                        "temperature": 0.7,
-                    }
+                    "model": "llama3-8b-8192",
+                    "messages": messages,
+                    "max_tokens": 1024,
+                    "temperature": 0.7,
                 }
             )
 
         if response.status_code != 200:
             raise HTTPException(
                 status_code=500,
-                detail=f"Gemini error: {response.text}"
+                detail=f"Groq error: {response.text}"
             )
 
         data = response.json()
-        reply = data["candidates"][0]["content"]["parts"][0]["text"]
+        reply = data["choices"][0]["message"]["content"]
         return {"reply": reply}
 
     except httpx.TimeoutException:
