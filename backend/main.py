@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import io
 import numpy as np
+import httpx
 
 app = FastAPI(title="HiveIQ API")
 
@@ -235,3 +236,77 @@ def serve_app():
             "Expires": "0"
         }
     )
+
+@app.post("/chat")
+async def chat(request: dict):
+    message = request.get("message", "")
+    history = request.get("history", [])
+
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="API key not configured")
+
+    # Build conversation history for Gemini
+    gemini_messages = []
+    for h in history[-10:]:
+        role = "user" if h["role"] == "user" else "model"
+        gemini_messages.append({
+            "role": role,
+            "parts": [{"text": h["content"]}]
+        })
+
+    # Add current message
+    gemini_messages.append({
+        "role": "user",
+        "parts": [{"text": message}]
+    })
+
+    # System prompt about beekeeping
+    system_prompt = """You are BeeBot, a friendly expert beekeeping 
+assistant specializing in Apis mellifera (Western honey bee). 
+You help beekeepers with:
+- Hive health and disease identification
+- Treatment for Varroa, AFB, Chalkbrood
+- Seasonal hive management
+- Queen rearing and swarm prevention
+- Honey harvesting and extraction
+- Equipment and best practices
+- Bee biology and behavior
+
+Keep answers practical, clear and friendly.
+Use simple language for beginners.
+When disease is suspected always recommend 
+consulting a local bee inspector.
+Always remember the user keeps Apis mellifera bees."""
+
+    # Call Gemini API
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+            headers={"Content-Type": "application/json"},
+            json={
+                "system_instruction": {
+                    "parts": [{"text": system_prompt}]
+                },
+                "contents": gemini_messages,
+                "generationConfig": {
+                    "maxOutputTokens": 1024,
+                    "temperature": 0.7,
+                }
+            }
+        )
+
+    if response.status_code != 200:
+        error = response.text
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gemini error: {error}"
+        )
+
+    data = response.json()
+    reply = data["candidates"][0]["content"]["parts"][0]["text"]
+
+    return {"reply": reply}
