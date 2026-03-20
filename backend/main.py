@@ -2,16 +2,18 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from PIL import Image
 import io
 import numpy as np
 import httpx
+import os
+import sqlite3
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
 
 app = FastAPI(title="HiveIQ API")
-
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import os
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,12 +21,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ── Database setup ─────────────────────────────────────────
-import sqlite3
-import json
-from datetime import datetime, timedelta
-from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "hiveiq.db"
 
@@ -108,8 +104,6 @@ def get_alerts(hive_name: str):
             })
     return alerts
 
-# ── Classifier ─────────────────────────────────────────────
-
 def analyze_image(img_array: np.ndarray) -> dict:
     img = img_array.astype(np.float32) / 255.0
     r, g, b = img[:,:,0], img[:,:,1], img[:,:,2]
@@ -168,8 +162,6 @@ def analyze_image(img_array: np.ndarray) -> dict:
         "recommendations": recs,
     }
 
-# ── Routes ─────────────────────────────────────────────────
-
 @app.on_event("startup")
 def startup():
     init_db()
@@ -185,28 +177,19 @@ async def scan_hive(
 ):
     try:
         contents = await file.read()
-        
-        # Handle image opening safely
         try:
             image = Image.open(io.BytesIO(contents)).convert("RGB")
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid image: {str(e)}")
-        
         image = image.resize((224, 224))
         img_array = np.array(image)
-
         result = analyze_image(img_array)
         result["hive_name"] = hive_name
-        
-        # Save to database safely
         try:
             save_scan(result)
         except Exception as e:
             print(f"DB save error: {e}")
-            # Continue even if save fails
-        
         return result
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -230,12 +213,14 @@ def list_hives():
 @app.get("/app")
 def serve_app():
     html_path = os.path.join(os.path.dirname(__file__), "..", "mobile", "index.html")
-    return FileResponse(
-        html_path,
+    with open(html_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return HTMLResponse(
+        content=content,
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
-            "Expires": "0"
+            "Expires": "0",
         }
     )
 
@@ -259,7 +244,6 @@ async def chat(request: ChatRequest):
     if not api_key:
         raise HTTPException(status_code=500, detail="API key not configured")
 
-    # Build messages
     messages = [
         {
             "role": "system",
@@ -282,14 +266,12 @@ Always remember the user keeps Apis mellifera bees."""
         }
     ]
 
-    # Add history
     for h in history[-10:]:
         messages.append({
             "role": h.role,
             "content": h.content
         })
 
-    # Add current message
     messages.append({
         "role": "user",
         "content": message
@@ -304,7 +286,7 @@ Always remember the user keeps Apis mellifera bees."""
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "llama3-8b-8192",
+                    "model": "llama-3.1-8b-instant",
                     "messages": messages,
                     "max_tokens": 1024,
                     "temperature": 0.7,
